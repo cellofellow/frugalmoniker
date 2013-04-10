@@ -29,7 +29,7 @@ class NamecheapClient(object):
     def __init__(self, api_user, api_key, username, client_ip=None,
                  environment='https://api.namecheap.com/xml.response'):
         if not client_ip:
-            client_ip = requests.get('http://icanhazip.com').text
+            client_ip = requests.get('http://icanhazip.com').text.strip()
 
         self.base_opts = {
             'ApiUser': api_user,
@@ -164,15 +164,54 @@ class NamecheapClient(object):
         response = self.request(**get_opts)
 
         doc = xmltodict.parse(response.text)
+        errors = doc['ApiResponse']['Errors']
+        if errors:
+            raise Exception(errors)
+
         result = doc['ApiResponse']['CommandResponse']['DomainGetListResult']
         domains = result['Domain']
-        domains = [Domain(**{k[1:]: v for k, v in domain.iteritems()})
+        domains = [Domain(self, **{k[1:]: v for k, v in domain.iteritems()})
                    for domain in domains]
         return domains
 
+    def domains_dns_set_custom(self, sld=None, tld=None, nameservers):
+        '''
+        Send a request with the command 'namecheap.domains.dns.setCustom'.
+        Sets custom nameservers on a provided domain name.
+
+        Domain name is provided split into second-level domain (sld) and
+        top-level domain (tld). Provide nameservers as an iterable of strings.
+
+        The server will check that the provided nameservers exist, and if it
+        doesn't it will return errors and this method will raise an exception.
+
+        See http://goo.gl/0x6nh for docs on namecheap.domains.dns.setCustom
+        command.
+
+        Example usage:
+
+        >>> response = client.domains_dns_set_custom('example', 'com', [
+                'ns1.example.com', 'ns2.example.com'])
+        '''
+        command = 'namecheap.domains.dns.setCustom'
+        get_opts = {'Command': command, 'SLD': sld, 'TLD': tld}
+        nameservers = ','.join(ns.upper() for ns in nameservers)
+        get_opts['Nameservers'] = nameservers
+        
+        response = self.request(**get_opts)
+
+        doc = xmltodict.parse(response.text)
+        errors = doc['ApiResponse']['Errors']
+        if errors:
+            raise Exception(errors)
+
+        # TODO Actually process the response with xmltodict
+        return response
+
 
 class Domain(object):
-    def __init__(self, **kwargs):
+    def __init__(self, client, **kwargs):
+        self.client = client
         self._original_dict = kwargs
         self.auto_renew = kwargs.get('AutoRenew')
         created = kwargs.get('Created')
@@ -193,6 +232,14 @@ class Domain(object):
     @property
     def sld(self):
         return self.name.split('.')[0]
+
+    def set_nameservers(self, nameservers):
+        '''
+        Set the nameservers on this domain. Takes a list of nameservers.
+        Calls NamecheapClient.domains_dns_set_custom().
+        '''
+        return self.client.domains_dns_set_custom(
+            self.sld, self.tld, nameservers)
 
 
 class Contact(object):
