@@ -261,6 +261,12 @@ class Domain(object):
         self.user = kwargs.get('User')
         self.whois_guard = kwargs.get('WhoisGuard')
 
+    def __repr__(self):
+        return u'<frugalmoniker.Domain %s' % unicode(self)
+
+    def __unicode__(self):
+        return u'%s' % (self.name)
+
     @property
     def tld(self):
         return self.name.split('.')[1]
