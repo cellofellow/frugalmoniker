@@ -24,12 +24,13 @@ class NamecheapClient(object):
     then call methods on the client object to interact with NameCheap.com.
 
     ClientIP option will automatically grab your IP from the web if you don't
-    provide it.
+    provide it. UserName is set to ApiUser if not provided.
     '''
-    def __init__(self, api_user, api_key, username, client_ip=None,
+    def __init__(self, api_user, api_key, username=None, client_ip=None,
                  environment='https://api.namecheap.com/xml.response'):
         if not client_ip:
             client_ip = requests.get('http://icanhazip.com').text.strip()
+        username = api_user if not username else username
 
         self.base_opts = {
             'ApiUser': api_user,
@@ -41,7 +42,7 @@ class NamecheapClient(object):
 
     def request(self, **kwargs):
         '''
-        General purpose API call function. Sends an HTTP GET request with all
+        General purpose API call function. Sends an HTTP POST request with all
         the required Global Parameters (http://goo.gl/gvGfu) to at get started
         on a request. All keyword arguments passed in are added to the request.
 
@@ -54,7 +55,7 @@ class NamecheapClient(object):
 
         opts = copy.copy(self.base_opts)
         opts.update(kwargs)
-        return requests.get(self.base_url, data=opts)
+        return requests.post(self.base_url, data=opts)
 
     def domains_create(self, domain_name, **kwargs):
         '''
@@ -110,29 +111,8 @@ class NamecheapClient(object):
         # TODO Actually process the response with xmltodict.
         return response
 
-    def domains_get_list(self, list_type='all', sort_by='name', page_size=10,
-                         page=1, search_term=None):
-        '''
-        Send a request with the command 'namecheap.domains.getList'.
-        Fetches a list of registered domains. There are no required arguments.
-
-        Optional arguments:
-            list_type:   can be "all", "expiring", or "expired".
-            sort_by:     can be "name", "expire_date", or "create_date",
-                         and a "-" at the front of each to reverse the sort.
-            page_size:   how many to paginate by.
-            page:        which page to get
-            search_term: keyword to search by
-
-        See http://goo.gl/v7Toh for docs on the namecheap.domains.getList
-        command.
-
-        Example usage:
-
-        >>> response = client.domains_get_list(sort_by='create_date')
-        '''
-
-        command = 'namecheap.domains.getList'
+    def common_get_list(self, command, list_type='all', sort_by='name',
+                        page_size=10, page=1, search_term=None):
         LIST_TYPES = {
             'all': 'ALL',
             'expiring': 'EXPIRING',
@@ -161,7 +141,30 @@ class NamecheapClient(object):
         if search_term:
             get_opts['SearchTerm'] = search_term
 
-        response = self.request(**get_opts)
+        return self.request(**get_opts)
+
+    def domains_get_list(self, **kwargs):
+        '''
+        Send a request with the command 'namecheap.domains.getList'.
+        Fetches a list of registered domains. There are no required arguments.
+
+        Optional arguments:
+            list_type:   can be "all", "expiring", or "expired".
+            sort_by:     can be "name", "expire_date", or "create_date",
+                         and a "-" at the front of each to reverse the sort.
+            page_size:   how many to paginate by.
+            page:        which page to get
+            search_term: keyword to search by
+
+        See http://goo.gl/v7Toh for docs on the namecheap.domains.getList
+        command.
+
+        Example usage:
+
+        >>> response = client.domains_get_list(sort_by='create_date')
+        '''
+        command = 'namecheap.domains.getList'
+        response = self.common_get_list(command, **kwargs)
 
         doc = xmltodict.parse(response.text)
         errors = doc['ApiResponse']['Errors']
@@ -174,7 +177,7 @@ class NamecheapClient(object):
                    for domain in domains]
         return domains
 
-    def domains_dns_set_custom(self, sld=None, tld=None, nameservers):
+    def domains_dns_set_custom(self, sld, tld, nameservers):
         '''
         Send a request with the command 'namecheap.domains.dns.setCustom'.
         Sets custom nameservers on a provided domain name.
@@ -197,7 +200,7 @@ class NamecheapClient(object):
         get_opts = {'Command': command, 'SLD': sld, 'TLD': tld}
         nameservers = ','.join(ns.upper() for ns in nameservers)
         get_opts['Nameservers'] = nameservers
-        
+
         response = self.request(**get_opts)
 
         doc = xmltodict.parse(response.text)
@@ -207,6 +210,39 @@ class NamecheapClient(object):
 
         # TODO Actually process the response with xmltodict
         return response
+    
+    def ssl_create(self, ssl_type, years=1):
+        command = 'namecheap.ssl.create'
+        if not ssl_type in (
+            'QuickSSL', 'QuickSSL Premium', 'RapidSSL', 'RapidSSL Wildcard',
+            'PremiumSSL', 'InstantSSL', 'PositiveSSL', 'PositiveSSL Wildcard',
+            'True BusinessID with EV', 'True BusinessID ',
+            'True BusinessID Wildcard ', 'Secure Site ', 'Secure Site Pro ',
+            'Secure Site with EV ', 'Secure Site Pro with EV', 'EssentialSSL',
+            'EssentialSSL Wildcard', 'InstantSSL Pro', 'Premiumssl wildcard',
+            'EV SSL', 'EV SSL SGC', 'SSL123', 'SSL Web Server',
+            'SGC Super Certs', 'SSL Webserver EV'):
+            raise ValueError('Invalid SSL Certificate Type')
+
+        get_opts = {'Command': command, 'Years': years, 'Type': ssl_type}
+        response = self.request(**get_opts)
+
+        # TODO Actually process response with xmltodict
+        return response
+
+    def ssl_get_list(self, **kwargs):
+        command = 'namecheap.ssl.getList'
+        response = self.common_get_list(command, **kwargs)
+        return response
+
+        doc = xmltodict.parse(response.text)
+        errors = doc['ApiResponse']['Errors']
+        if errors:
+            raise Exception(errors)
+
+        result = doc['ApiResponse']['CommandResponse']['SSLGetListResult']
+        certificates = result['Domain']
+        return domains
 
 
 class Domain(object):
