@@ -5,6 +5,8 @@ from datetime import datetime
 import requests
 import xmltodict
 
+PRODUCTION = 'https://api.namecheap.com/xml.response'
+SANDBOX = 'https://api.sandbox.namecheap.com/xml.response'
 
 class ContactValidationError(Exception):
     def __init__(self, value):
@@ -27,7 +29,7 @@ class NamecheapClient(object):
     provide it. UserName is set to ApiUser if not provided.
     '''
     def __init__(self, api_user, api_key, username=None, client_ip=None,
-                 environment='https://api.namecheap.com/xml.response'):
+                 environment=PRODUCTION):
         if not client_ip:
             client_ip = requests.get('http://icanhazip.com').text.strip()
         username = api_user if not username else username
@@ -262,7 +264,7 @@ class Domain(object):
         self.whois_guard = kwargs.get('WhoisGuard')
 
     def __repr__(self):
-        return u'<frugalmoniker.Domain %s' % unicode(self)
+        return u'<frugalmoniker.Domain %s>' % unicode(self)
 
     def __unicode__(self):
         return u'%s' % (self.name)
