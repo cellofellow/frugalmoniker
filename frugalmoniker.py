@@ -331,7 +331,7 @@ class Contact(object):
             raise ContactValidationError('fax is not in valid format')
 
     def _validate_phone_number(self, number):
-        phone_regex = re.compile('\+\d{3}\.\d{7}')
+        phone_regex = re.compile('^\+\d\.\d{10}$')
         if phone_regex.match(number):
             return True
         else:
