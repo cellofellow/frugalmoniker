@@ -200,7 +200,7 @@ class NamecheapClient(object):
         '''
         command = 'namecheap.domains.dns.setCustom'
         get_opts = {'Command': command, 'SLD': sld, 'TLD': tld}
-        nameservers = ','.join(ns.upper() for ns in nameservers)
+        nameservers = ','.join(ns.upper().strip('.') for ns in nameservers)
         get_opts['Nameservers'] = nameservers
 
         response = self.request(**get_opts)
