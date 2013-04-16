@@ -212,7 +212,7 @@ class NamecheapClient(object):
 
         # TODO Actually process the response with xmltodict
         return response
-    
+
     def ssl_create(self, ssl_type, years=1):
         command = 'namecheap.ssl.create'
         if not ssl_type in (
@@ -287,7 +287,27 @@ class Domain(object):
 
 
 class Contact(object):
-    __required_fields = (
+    '''A contact that is assigned to a domain name's WHOIS record.
+    Takes the following fields as keyword arguments: * indicates required.
+        first_name *
+        last_name *
+        address1 *
+        address2
+        city *
+        state_province *
+        postal_code *
+        country *
+        phone *
+        phone_ext
+        fax
+        email_address *
+
+    A special argument is prefix, which is prepended to the field names when
+    the as_dict() method is called. This is required because the Namecheap.com
+    API uses names like RegistrantFirstName instead of JSON or the like to
+    identify fields.
+    '''
+    _required_fields = (
         'first_name',
         'last_name',
         'address1',
@@ -321,7 +341,7 @@ class Contact(object):
         self.validate()
 
     def validate(self):
-        for field in self.__required_fields:
+        for field in self._required_fields:
             if not getattr(self, field):
                 raise ContactValidationError('{} is required'.format(field))
 
@@ -331,7 +351,7 @@ class Contact(object):
             raise ContactValidationError('fax is not in valid format')
 
     def _validate_phone_number(self, number):
-        phone_regex = re.compile('\+\d{3}\.\d{7}')
+        phone_regex = re.compile('^\+\d\.\d{10}$')
         if phone_regex.match(number):
             return True
         else:
@@ -346,6 +366,7 @@ class Contact(object):
                       string.title())
 
     def as_dict(self):
+        self.validate()
         ret = dict()
         for attr in dir(self):
             value = getattr(self, attr)
